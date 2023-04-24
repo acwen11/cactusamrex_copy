@@ -25,12 +25,10 @@ template <typename T> constexpr T radius_cube(const vect<T, dim> &X) {
   return maximum(abs(X));
 }
 
-template <typename T> constexpr T radius_boxes(const vect<T, dim> &X) {
+template <typename T> constexpr T radius_boxes(const vect<T, dim> &X, const vect<T, dim> &p1, const vect<T, dim> &p2, const vect<int, dim> &scale) {
   using std::abs;
-  using std::fmin;
-  const vect<T, dim> p1{1, 0, 1};
-  const vect<T, dim> p2{-1, 0, 1};
-  return fmin(maximum(abs(X - p1)), maximum(abs(X - p2)));
+  using std::fmin; 
+  return fmin(maximum(abs(scale * (X - p1))), maximum(abs(scale * (X - p2))));
 }
 
 template <typename T, int CI, int CJ, int CK>
@@ -56,6 +54,13 @@ extern "C" void ErrorEstimator_Estimate(CCTK_ARGUMENTS) {
   const GF3D2layout layout(cctkGH, indextype);
   const GF3D2<CCTK_REAL> regrid_error_(layout, regrid_error);
 
+  const int sim_iter = cctk_iteration;
+  const double freq = 2 * M_PI / 50;
+  const vect<double, dim> p1{10 * cos(freq * sim_iter), 10 * sin(freq * sim_iter), 1};
+  const vect<double, dim> p2{-10 * cos(freq * sim_iter), -10 * sin(freq * sim_iter), 1};
+  // const vect<double, dim> p1{10, 0, 1};
+  // const vect<double, dim> p2{-10, 0, 1};
+
   const shape_t shape = [&]() {
     if (CCTK_EQUALS(region_shape, "sphere"))
       return shape_t::sphere;
@@ -77,7 +82,7 @@ extern "C" void ErrorEstimator_Estimate(CCTK_ARGUMENTS) {
           case shape_t::cube:
             return radius_cube(scalefactors * p.X);
           case shape_t::boxes:
-            return radius_boxes(scalefactors * p.X);
+            return radius_boxes(p.X, p1, p2, scalefactors);
           default:
             assert(0);
           };
